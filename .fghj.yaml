@@ -8,6 +8,7 @@ services:
         primary: true
     environment: &env
       PORT: "3000"
+      DESCOPE_PROJECT_ID: P3LI324FSPO5UoyBi14QpP3wlU8p
       DATABASE_URL: postgres://files:dev@${FGHJ_SERVICE_FQDN:db}:5432/files
       # The http zone, not the raw one: this endpoint is baked into every
       # presigned URL, and the browser has to be able to reach it. The same
