@@ -8,3 +8,63 @@ services:
         primary: true
     environment:
       PORT: "3000"
+      DATABASE_URL: postgres://files:dev@${FGHJ_SERVICE_FQDN:db}:5432/files
+      # The http zone, not the raw one: this endpoint is baked into every
+      # presigned URL, and the browser has to be able to reach it. The same
+      # name works from inside this container, through the run's sidecar.
+      S3_ENDPOINT: https://${FGHJ_SERVICE_FQDN_HTTP:s3}
+      S3_BUCKET: files
+      S3_ACCESS_KEY: files
+      S3_SECRET_KEY: dev-secret
+      # ...which means trusting fghj's CA for our own calls to it.
+      NODE_EXTRA_CA_CERTS: /etc/fghj/certs/cert.pem
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3000/api/health"]
+      interval: 2
+      retries: 15
+    depends_on:
+      db: {condition: service_healthy}
+      s3: {condition: service_healthy}
+
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: files
+      POSTGRES_PASSWORD: dev
+      POSTGRES_DB: files
+    ports: ["5432"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U files"]
+      interval: 2
+      retries: 15
+    stop_grace_period: 30
+    volumes:
+      - name: pgdata
+        container: /var/lib/postgresql/data
+
+  s3:
+    # MinIO no longer publishes public images; Chainguard's build is the
+    # free one left. It has no curl or mc, hence the bare-shell healthcheck.
+    image: cgr.dev/chainguard/minio:latest
+    command: ["server", "/data", "--console-address", ":9001"]
+    environment:
+      MINIO_ROOT_USER: files
+      MINIO_ROOT_PASSWORD: dev-secret
+    ports:
+      "9000":
+        primary: true
+      "9001":
+        name: console
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - >-
+          exec 3<>/dev/tcp/127.0.0.1/9000 &&
+          printf 'GET /minio/health/ready HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n' >&3 &&
+          read -r line <&3 && case "$line" in *" 200 "*) exit 0;; esac; exit 1
+      interval: 2
+      retries: 15
+    volumes:
+      - name: s3data
+        container: /data
+
