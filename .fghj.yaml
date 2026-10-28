@@ -1,0 +1,10 @@
+version: "2.0"
+
+services:
+  api:
+    build: .
+    ports:
+      "3000":
+        primary: true
+    environment:
+      PORT: "3000"
