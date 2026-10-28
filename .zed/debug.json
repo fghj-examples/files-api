@@ -1,0 +1,14 @@
+// Attach Zed to the api's Node inspector (debug: 9229 in .fghj.yaml).
+// The address assumes the workspace folder is called `files`.
+[
+  {
+    "adapter": "JavaScript",
+    "label": "api (fghj)",
+    "type": "node",
+    "request": "attach",
+    "address": "api.files-api.files.fghj.raw.internal",
+    "port": 9229,
+    "localRoot": "$ZED_WORKTREE_ROOT",
+    "remoteRoot": "/app"
+  }
+]

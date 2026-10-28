@@ -9,6 +9,8 @@ services:
     ports:
       "3000":
         primary: true
+    # Node's inspector; docker-entrypoint.sh starts it.
+    debug: 9229
     environment: &env
       PORT: "3000"
       DESCOPE_PROJECT_ID: P3LI324FSPO5UoyBi14QpP3wlU8p
