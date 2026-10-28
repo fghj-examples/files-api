@@ -6,7 +6,7 @@ services:
     ports:
       "3000":
         primary: true
-    environment:
+    environment: &env
       PORT: "3000"
       DATABASE_URL: postgres://files:dev@${FGHJ_SERVICE_FQDN:db}:5432/files
       # The http zone, not the raw one: this endpoint is baked into every
@@ -68,3 +68,31 @@ services:
       - name: s3data
         container: /data
 
+  migrate-db:
+    image: ghcr.io/amacneil/dbmate:2
+    command: ["--wait", "--no-dump-schema", "up"]
+    migrates: db
+    environment:
+      DATABASE_URL: postgres://files:dev@${FGHJ_SERVICE_FQDN:db}:5432/files?sslmode=disable
+      DBMATE_MIGRATIONS_DIR: /db/migrations
+    volumes:
+      - host: ./db
+        container: /db
+        read_only: true
+
+  # A bucket is an object store's schema: create it, idempotently, on every
+  # run that includes s3.
+  migrate-s3:
+    build: .
+    command: ["node", "src/migrate-s3.ts"]
+    migrates: s3
+    environment: *env
+
+  # One seed for both stores: the rows it inserts point at the objects it
+  # uploads, so the two only make sense together. Wipe either volume and it
+  # runs again for both.
+  seed:
+    build: .
+    command: ["node", "src/seed.ts"]
+    seeds: [db, s3]
+    environment: *env
