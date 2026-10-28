@@ -1,5 +1,8 @@
 version: "2.0"
 
+include:
+  platform: https://github.com/fghj-examples/files-platform.git
+
 services:
   api:
     build: .
@@ -10,6 +13,7 @@ services:
       PORT: "3000"
       DESCOPE_PROJECT_ID: P3LI324FSPO5UoyBi14QpP3wlU8p
       DATABASE_URL: postgres://files:dev@${FGHJ_SERVICE_FQDN:db}:5432/files
+      REDIS_URL: redis://${FGHJ_SERVICE_FQDN:platform/redis}:6379
       # The http zone, not the raw one: this endpoint is baked into every
       # presigned URL, and the browser has to be able to reach it. The same
       # name works from inside this container, through the run's sidecar.
@@ -17,6 +21,7 @@ services:
       S3_BUCKET: files
       S3_ACCESS_KEY: files
       S3_SECRET_KEY: dev-secret
+      INTERNAL_TOKEN: dev-internal
       # ...which means trusting fghj's CA for our own calls to it.
       NODE_EXTRA_CA_CERTS: /etc/fghj/certs/cert.pem
     healthcheck:
@@ -26,6 +31,7 @@ services:
     depends_on:
       db: {condition: service_healthy}
       s3: {condition: service_healthy}
+      platform/cache: {}
 
   db:
     image: postgres:16-alpine
@@ -97,3 +103,10 @@ services:
     command: ["node", "src/seed.ts"]
     seeds: [db, s3]
     environment: *env
+    depends_on:
+      platform/cache: {}
+
+flows:
+  app: [api]
+  storage: [s3]
+  demo: [api, seed]

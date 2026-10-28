@@ -2,6 +2,7 @@
 // written together. fghj runs this only when db or s3 holds new data.
 import { PutObjectCommand } from "@aws-sdk/client-s3";
 import { db } from "./db.ts";
+import { enqueueThumbnail, redis } from "./queue.ts";
 import { bucket, s3 } from "./s3.ts";
 
 function poster(title: string, hue: number) {
@@ -31,6 +32,7 @@ const samples = [
   },
 ];
 
+await redis.connect();
 // The seed only runs over new data, but a fresh s3 next to an old db would
 // still hold last time's rows, so start from a clean slate.
 await db.query(`delete from files where owner_id is null`);
@@ -45,12 +47,14 @@ for (const sample of samples) {
       ContentType: sample.contentType,
     }),
   );
-  await db.query(
+  const { rows } = await db.query<{ id: string }>(
     `insert into files (owner_id, name, content_type, size, object_key, status)
-     values (null, $1, $2, $3, $4, 'ready')`,
+     values (null, $1, $2, $3, $4, 'ready') returning id`,
     [sample.name, sample.contentType, Buffer.byteLength(sample.body), key],
   );
+  await enqueueThumbnail({ fileId: rows[0].id, key, contentType: sample.contentType });
   console.log(`seeded ${key}`);
 }
 
 await db.end();
+redis.disconnect();
